@@ -478,6 +478,13 @@ func readAndVerifyJournal(path string) (Verification, []Event, error) {
 		if err := dec.Decode(&event); err != nil {
 			return verification, nil, fmt.Errorf("journal line %d: %w", lineNumber, err)
 		}
+		var extra any
+		if err := dec.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return verification, nil, fmt.Errorf("journal line %d contains multiple JSON values", lineNumber)
+			}
+			return verification, nil, fmt.Errorf("journal line %d: %w", lineNumber, err)
+		}
 		if event.Version != journalVersion {
 			return verification, nil, fmt.Errorf("journal line %d has unsupported version %d", lineNumber, event.Version)
 		}
