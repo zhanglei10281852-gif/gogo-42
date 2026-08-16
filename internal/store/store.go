@@ -472,10 +472,21 @@ func readAndVerifyJournal(path string) (Verification, []Event, error) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			return verification, nil, fmt.Errorf("journal line %d is blank", lineNumber)
 		}
+		// Each journal line must hold exactly one JSON event. A second JSON
+		// value or any other malformed trailing content after a valid event
+		// is rejected; trailing whitespace remains acceptable because the
+		// decoder skips it before reaching EOF.
 		dec := json.NewDecoder(bytes.NewReader(line))
 		dec.DisallowUnknownFields()
 		var event Event
 		if err := dec.Decode(&event); err != nil {
+			return verification, nil, fmt.Errorf("journal line %d: %w", lineNumber, err)
+		}
+		var extra any
+		if err := dec.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return verification, nil, fmt.Errorf("journal line %d contains multiple JSON values", lineNumber)
+			}
 			return verification, nil, fmt.Errorf("journal line %d: %w", lineNumber, err)
 		}
 		if event.Version != journalVersion {
